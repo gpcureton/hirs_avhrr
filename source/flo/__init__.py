@@ -1,5 +1,4 @@
 
-from datetime import datetime
 import os
 from flo.computation import Computation
 from flo.subprocess import check_call
@@ -10,13 +9,17 @@ from flo.sw.hirs.delta import delta_catalog
 
 class HIRS_AVHRR(Computation):
 
-    parameters = ['granule', 'sat', 'hirs_version']
+    parameters = ['granule', 'sat', 'hirs_version', 'collo_version']
     outputs = ['out']
 
     def build_task(self, context, task):
-        
-        task.input('HIR1B', HIRS().dataset('out').product(context))
-        task.input('PTMSX', delta_catalog.file('avhrr', context['sat'], 'PTMSX', context['granule']))
+
+        hirs_context = context.copy()
+        hirs_context.pop('collo_version')
+
+        task.input('HIR1B', HIRS().dataset('out').product(hirs_context))
+        task.input('PTMSX', delta_catalog.file('avhrr', context['sat'], 'PTMSX',
+                   context['granule']))
 
     def run_task(self, inputs, context):
 
@@ -31,12 +34,13 @@ class HIRS_AVHRR(Computation):
         print cmd
         check_call(cmd, shell=True, env=augmented_env({'LD_LIBRARY_PATH': lib_dir}))
 
-        return {'out': output } 
+        return {'out': output}
 
-    def find_contexts(self, sat, hirs_version, time_interval):
+    def find_contexts(self, sat, hirs_version, collo_version, time_interval):
 
         files = delta_catalog.files('avhrr', sat, 'PTMSX', time_interval)
         return [{'granule': file.data_interval.left,
-                'sat': sat,
-                'hirs_version': hirs_version}
+                 'sat': sat,
+                 'hirs_version': hirs_version,
+                 'collo_version': collo_version}
                 for file in files]
