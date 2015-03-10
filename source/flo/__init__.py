@@ -19,7 +19,7 @@ class HIRS_AVHRR(Computation):
 
         task.input('HIR1B', HIRS().dataset('out').product(hirs_context))
         task.input('PTMSX', delta_catalog.file('avhrr', context['sat'], 'PTMSX',
-                   context['granule']))
+                                               context['granule']))
 
     def run_task(self, inputs, context):
 
@@ -38,7 +38,7 @@ class HIRS_AVHRR(Computation):
 
     def find_contexts(self, sat, hirs_version, collo_version, time_interval):
 
-        files = delta_catalog.files('avhrr', sat, 'PTMSX', time_interval)
+        files = delta_catalog.files('hirs', sat, 'HIR1B', time_interval)
         return [{'granule': file.data_interval.left,
                  'sat': sat,
                  'hirs_version': hirs_version,
