@@ -6,6 +6,10 @@ from flo.util import augmented_env, symlink_inputs_to_working_dir
 from flo.sw.hirs import HIRS
 from flo.sw.hirs.delta import delta_catalog
 
+# every module should have a LOG object
+import logging, traceback
+LOG = logging.getLogger(__file__)
+
 
 class HIRS_AVHRR(Computation):
 

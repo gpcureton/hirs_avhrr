@@ -3,13 +3,17 @@ import os
 import shutil
 from flo_deploy.packagelib import *
 
+# every module should have a LOG object
+import logging, traceback
+LOG = logging.getLogger(__file__)
+
 class HIRS_AVHRR_Package(Package):
 
     def deploy_package(self):
-        for ver in ['v20140204']:
-            self.merge(CppCollocation().path(), 'v20140204')
-            self.merge(Netcdf().path(), 'v20140204')
-            self.merge(Hdf5().path(), 'v20140204')
+        for ver in ['v20151014']:
+            self.merge(CppCollocation().path(), 'v20151014')
+            self.merge(Netcdf().path(), 'v20151014')
+            self.merge(Hdf5().path(), 'v20151014')
 
 class CppCollocation(Resource):
 
