@@ -3,17 +3,18 @@ import sys
 import time
 import re
 import string
+from copy import copy
 from datetime import datetime, timedelta
 from calendar import monthrange
 import logging
 import traceback
-import getpass
 
 from subprocess import CalledProcessError, call
 from subprocess import Popen, STDOUT, PIPE
 
 from flo.time import TimeInterval
 from flo.ui import safe_submit_order
+from flo.product import StoredProductCatalog
 
 from flo.sw.hirs_avhrr import HIRS_AVHRR
 
@@ -30,6 +31,7 @@ logging.basicConfig(stream=sys.stdout, level=levels[3],
 
 # General information
 comp = HIRS_AVHRR()
+SPC = StoredProductCatalog()
 
 # Latest Computation versions.
 hirs_version = 'v20151014'
@@ -43,20 +45,51 @@ platform = 'metop-b'
 
 # Specify the intervals
 wedge = timedelta(seconds=1.)
-intervals = [
-    TimeInterval(datetime(2016, 12, 1),datetime(2016, 12, 2) - wedge),
-    #TimeInterval(datetime(2016, 3, 18), datetime(2016, 3, 19) - wedge)
-]
+#intervals = [
+    #TimeInterval(datetime(2016, 1, 1), datetime(2016, 2, 1) - wedge),
+    #TimeInterval(datetime(2016, 2, 1), datetime(2016, 3, 1) - wedge),
+    #TimeInterval(datetime(2016, 3, 1), datetime(2016, 4, 1) - wedge),
+    #TimeInterval(datetime(2016, 4, 1), datetime(2016, 5, 1) - wedge),
+    #TimeInterval(datetime(2016, 5, 1), datetime(2016, 6, 1) - wedge),
+    #TimeInterval(datetime(2016, 6, 1), datetime(2016, 7, 1) - wedge),
+    #TimeInterval(datetime(2016, 7, 1), datetime(2016, 8, 1) - wedge),
+    #TimeInterval(datetime(2016, 8, 1), datetime(2016, 9, 1) - wedge),
+    #TimeInterval(datetime(2016, 9, 1), datetime(2016, 10, 1) - wedge),
+    #TimeInterval(datetime(2016, 10, 1),datetime(2016, 11, 1) - wedge),
+    #TimeInterval(datetime(2016, 11, 1),datetime(2016, 12, 1) - wedge),
+    #TimeInterval(datetime(2016, 12, 1),datetime(2017, 1, 1) - wedge),
+#]
+
+# Examine how many of the defined contexts are populated
+intervals = []
+year,month = 2016,4
+days = range(1,monthrange(year, month)[1]+1)
+for day in days:
+    dt_start = datetime(year, month, day)
+    dt_end = datetime(year, month, day) + timedelta(days = 1)
+    interval = TimeInterval(dt_start, dt_end - wedge)
+    contexts = comp.find_contexts(platform, hirs_version, collo_version, interval)
+    num_contexts_exist = 0
+    for context in contexts:
+        num_contexts_exist += SPC.exists(comp.dataset('out').product(context))
+    LOG.info("Interval {} has {}/{} contexts existing".format(interval, num_contexts_exist, len(contexts)))
+    missing_contexts = len(contexts) - num_contexts_exist
+    if missing_contexts > 3:
+        intervals.append(interval)
+
 
 LOG.info("Submitting intervals...")
 for interval in intervals:
-    LOG.info("Submitting interval {} -> {}".format(interval.left, interval.right))
+    LOG.info("\tSubmitting interval {} -> {}".format(interval.left, interval.right))
     contexts = comp.find_contexts(platform, hirs_version, collo_version, interval)
-    LOG.info("\tThere are {} contexts in this interval".format(len(contexts)))
+    LOG.info("\tProcessing {}/{} contexts in this interval".format(num_contexts_exist, len(contexts)))
     contexts.sort()
-    for context in contexts:
-        print context
+    ##for context in contexts:
+        ##LOG.debug(context)
     LOG.info("\tFirst context: {}".format(contexts[0]))
     LOG.info("\tLast context:  {}".format(contexts[-1]))
-    LOG.info("\t{}".format(safe_submit_order(comp, [comp.dataset('out')], contexts, download_onlies=[])))
+    LOG.info("\t{}".format(safe_submit_order(comp,
+                                             [comp.dataset('out')],
+                                             contexts,
+                                             download_onlies=[])))
 
