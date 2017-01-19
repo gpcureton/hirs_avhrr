@@ -1,13 +1,12 @@
 import os
 from datetime import datetime, timedelta
-
-from flo.time import TimeInterval
-from flo.ui import local_prepare, local_execute, submit_order
-#from flo.sw.hirs import HIRS
-from flo.sw.hirs_avhrr import HIRS_AVHRR
-
 import logging
 import traceback
+
+from flo.time import TimeInterval
+from flo.ui import local_prepare, local_execute
+
+from flo.sw.hirs_avhrr import HIRS_AVHRR
 
 # every module should have a LOG object
 LOG = logging.getLogger(__file__)
@@ -34,23 +33,8 @@ comp = HIRS_AVHRR()
 # Local execution
 #
 
-# General information
-granule = datetime(2013, 3, 29, 0, 0)
-
-# HIRS alg options
-hirs_version = 'v20151014'
-collo_version = 'v20151014'
-
-platform_choices = ['noaa-06', 'noaa-07', 'noaa-08', 'noaa-09', 'noaa-10', 'noaa-11',
-                    'noaa-12', 'noaa-14', 'noaa-15', 'noaa-16', 'noaa-17', 'noaa-18',
-                    'noaa-19', 'metop-a', 'metop-b']
-
-platform = 'metop-b'
-
-
-def local_execute_example(granule, platform, hirs_version, collo_version, skip_prepare=False, skip_execute=False):
-
-    LOG.info("We are doing {}".format(platform))
+def local_execute_example(granule, platform, hirs_version, collo_version, skip_prepare=False,
+                          skip_execute=False):
     comp_dict = {
         'granule': granule,
         'sat': platform,
@@ -61,7 +45,7 @@ def local_execute_example(granule, platform, hirs_version, collo_version, skip_p
     try:
         if not skip_prepare:
             LOG.info("Running local prepare...")
-            local_prepare(comp, comp_dict)
+            local_prepare(comp, comp_dict, download_only=[])
         if not skip_execute:
             LOG.info("Running local execute...")
             local_execute(comp, comp_dict)
@@ -79,4 +63,14 @@ def print_contexts(dt_left, dt_right, granule_length):
 
     return contexts
 
-# local_execute_example(datetime(2016, 3, 18), 'metop-b', 'v20151014')
+platform_choices = ['noaa-06', 'noaa-07', 'noaa-08', 'noaa-09', 'noaa-10', 'noaa-11',
+                    'noaa-12', 'noaa-14', 'noaa-15', 'noaa-16', 'noaa-17', 'noaa-18',
+                    'noaa-19', 'metop-a', 'metop-b']
+
+platform = 'metop-b'
+hirs_version  = 'v20151014'
+collo_version = 'v20151014'
+granule = datetime(2016, 6, 3, 21, 17)
+granule = datetime(2016, 6, 3, 20, 32)
+
+# local_execute_example(granule, platform, hirs_version, collo_version)
