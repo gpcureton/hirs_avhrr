@@ -3,14 +3,10 @@ import sys
 import time
 import re
 import string
-from copy import copy
 from datetime import datetime, timedelta
 from calendar import monthrange
 import logging
 import traceback
-
-from subprocess import CalledProcessError, call
-from subprocess import Popen, STDOUT, PIPE
 
 from flo.time import TimeInterval
 from flo.ui import safe_submit_order
@@ -77,15 +73,14 @@ for day in days:
     if missing_contexts > 3:
         intervals.append(interval)
 
-
 LOG.info("Submitting intervals...")
 for interval in intervals:
     LOG.info("\tSubmitting interval {} -> {}".format(interval.left, interval.right))
     contexts = comp.find_contexts(platform, hirs_version, collo_version, interval)
     LOG.info("\tProcessing {}/{} contexts in this interval".format(num_contexts_exist, len(contexts)))
     contexts.sort()
-    ##for context in contexts:
-        ##LOG.debug(context)
+    for context in contexts:
+        LOG.debug(context)
     LOG.info("\tFirst context: {}".format(contexts[0]))
     LOG.info("\tLast context:  {}".format(contexts[-1]))
     LOG.info("\t{}".format(safe_submit_order(comp,
