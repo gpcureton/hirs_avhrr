@@ -1,5 +1,12 @@
 #!/usr/bin/env python
 # encoding: utf-8
+"""
+
+Purpose: Run the hirs_avhrr package
+
+Copyright (c) 2015 University of Wisconsin Regents.
+Licensed under GNU GPLv3.
+"""
 
 import sys
 import traceback
@@ -13,10 +20,6 @@ from flo.sw.hirs.utils import setup_logging
 
 # every module should have a LOG object
 LOG = logging.getLogger(__name__)
-
-#
-# Local execution
-#
 
 # General information
 hirs_version  = 'v20151014'
@@ -40,9 +43,9 @@ collection = {'HIR1B': 'ILIAD',
 
 # Metop-B
 #satellite = 'metop-b'
-input_data = {'HIR1B': '/mnt/sdata/geoffc/HIRS_processing/data_lists/Metop-B/HIR1B_metop-b_latest',
-              'CFSR':  '/mnt/sdata/geoffc/HIRS_processing/data_lists/CFSR.out',
-              'PTMSX': '/mnt/sdata/geoffc/HIRS_processing/data_lists/Metop-B/PTMSX_metop-b_latest'}
+input_data = {'HIR1B': '/mnt/cephfs_data/geoffc/hirs_data_lists/Metop-B/HIR1B_metop-b_latest',
+              'CFSR':  '/mnt/cephfs_data/geoffc/hirs_data_lists/CFSR.out',
+              'PTMSX': '/mnt/cephfs_data/geoffc/hirs_data_lists/Metop-B/PTMSX_metop-b_latest'}
 
 input_sources = {'collection':collection, 'input_data':input_data}
 
@@ -62,9 +65,7 @@ def local_execute_example(interval, satellite, hirs_version, collo_version,
     setup_logging(verbosity)
 
     # Get the required context...
-    LOG.info("Getting required contexts for local execution...")
     contexts =  comp.find_contexts(interval, satellite, hirs_version, collo_version)
-    LOG.info("Finished getting required contexts for local execution\n")
 
     if len(contexts) != 0:
         LOG.info("Candidate contexts in interval...")

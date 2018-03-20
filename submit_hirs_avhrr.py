@@ -1,5 +1,12 @@
 #!/usr/bin/env python
 # encoding: utf-8
+"""
+
+Purpose: Run the hirs_avhrr package
+
+Copyright (c) 2015 University of Wisconsin Regents.
+Licensed under GNU GPLv3.
+"""
 
 import sys
 import traceback
@@ -67,7 +74,7 @@ input_data = {'HIR1B': '/mnt/sdata/geoffc/HIRS_processing/data_lists/Metop-B/HIR
 
 input_sources = {'collection':collection, 'input_data':input_data}
 
-# Initialize the hirs module with the data locations
+# Initialize the hirs_avhrr module with the data locations
 hirs_avhrr.set_input_sources(input_sources)
 
 # Instantiate the computation
