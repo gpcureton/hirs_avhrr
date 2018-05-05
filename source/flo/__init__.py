@@ -27,7 +27,7 @@ import sipsprod
 from glutil import (
     check_call,
     #dawg_catalog,
-    #delivered_software,
+    delivered_software,
     support_software,
     runscript,
     prepare_env,
@@ -45,31 +45,13 @@ LOG = logging.getLogger(__name__)
 
 SPC = StoredProductCatalog()
 
-sat_code_to_satellite = {
-    'NA' : 'noaa-06',
-    'NC' : 'noaa-07',
-    'NE' : 'noaa-08',
-    'NF' : 'noaa-09',
-    'NG' : 'noaa-10',
-    'NH' : 'noaa-11',
-    'ND' : 'noaa-12',
-    'NJ' : 'noaa-14',
-    'NK' : 'noaa-15',
-    'NL' : 'noaa-16',
-    'NM' : 'noaa-17',
-    'NN' : 'noaa-18',
-    'NP' : 'noaa-19',
-    'M2' : 'metop-a',
-    'M1' : 'metop-b' 
-    }
-
 def set_input_sources(input_locations):
     global delta_catalog
     delta_catalog = DeltaCatalog(**input_locations)
 
 class HIRS_AVHRR(Computation):
 
-    parameters = ['granule', 'satellite', 'hirs2nc_delivery_id', 'collo_version']
+    parameters = ['granule', 'satellite', 'hirs2nc_delivery_id', 'hirs_avhrr_delivery_id']
     outputs = ['out']
 
     @reraise_as(WorkflowNotReady, FileNotFound, prefix='NSS.GHRR')
@@ -85,7 +67,7 @@ class HIRS_AVHRR(Computation):
         granule = context['granule']
 
         hirs_context = context.copy()
-        hirs_context.pop('collo_version')
+        hirs_context.pop('hirs_avhrr_delivery_id')
         LOG.debug("hirs_context: {}".format(hirs_context))
 
         # Initialize the hirs2nc module with the data locations
@@ -110,7 +92,7 @@ class HIRS_AVHRR(Computation):
         LOG.info('inputs = {}'.format(inputs))
 
         satellite = context['satellite']
-        collo_version = context['collo_version']
+        hirs_avhrr_delivery_id = context['hirs_avhrr_delivery_id']
 
         hirs_file = inputs['HIR1B']
         patmosx_file = inputs['PTMSX']
@@ -119,23 +101,25 @@ class HIRS_AVHRR(Computation):
         work_dir = abspath(curdir)
         LOG.debug("working dir = {}".format(work_dir))
 
+        # Get the required collocation exe
+        delivery = delivered_software.lookup('hirs_avhrr', delivery_id=hirs_avhrr_delivery_id)
+        dist_root = pjoin(delivery.path, 'dist')
+        hirs_avhrr_bin = pjoin(dist_root, 'bin/hirs_avhrr_v4.exe')
+        version = delivery.version
+
+        # Get the required  environment variables
+        env = prepare_env([delivery])
+        LOG.debug(env)
+
         # Removing the output file if it exists
         granule_datestamp = '.'.join(basename(hirs_file).split('.')[3:8])
-        output_file = 'colloc.hirs.avhrr.{}.{}.v{}.hdf'.format(satellite, granule_datestamp, collo_version)
+        output_file = 'colloc.hirs.avhrr.{}.{}.v{}.hdf'.format(satellite, granule_datestamp, version)
         if os.path.exists(output_file):
             LOG.info('{} exists, removing...'.format(output_file))
             os.remove(output_file)
 
-        # Get the required collocation exe
-        hirs_avhrr = support_software.lookup('collopak', version=collo_version)
-        hirs_avhrr_bin = pjoin(hirs_avhrr.path,'bin/hirs_avhrr')
-
-        # Get the required  environment variables
-        env = prepare_env([hirs_avhrr])
-        LOG.debug(env)
-
-        cmd = '{} {} {}'.format(hirs_avhrr_bin, hirs_file, patmosx_file)
-        #cmd = 'sleep 1; touch colloc.avhrr_metopb.avhrr_metopb.20140101T000900_000900.nc'
+        cmd = '{} {} {} {}'.format(hirs_avhrr_bin, hirs_file, patmosx_file, output_file)
+        #cmd = 'sleep 1; touch {}'.format(output_file)
 
         try:
             LOG.debug("cmd = \\\n\t{}".format(cmd.replace(' ',' \\\n\t')))
@@ -146,14 +130,11 @@ class HIRS_AVHRR(Computation):
             LOG.error("hirs_avhrr binary {} returned a value of {}".format(hirs_avhrr_bin, rc_hirs_avhrr))
             return rc_hirs_avhrr, []
 
-        # Move vnpaerdt file to the output directory
-        temp_output_file = pjoin(work_dir, 'colloc.*.nc')
-        temp_output_file = glob(temp_output_file)
-        if len(temp_output_file) != 0:
-            temp_output_file = temp_output_file[0]
-            LOG.info('Found collocation file "{}", moving to {}...'.format(temp_output_file, output_file))
-            shutil.move(temp_output_file, output_file)
-            output_file = glob(output_file)[0]
+        # Verify output file
+        output_file = glob(output_file)
+        if len(output_file) != 0:
+            output_file = output_file[0]
+            LOG.info('Found collocation file "{}"'.format(output_file))
         else:
             LOG.error('There are no output collocation file "{}", aborting'.format(output_file))
             rc = 1
@@ -184,7 +165,7 @@ class HIRS_AVHRR(Computation):
 
         return {'out': nc_compress(output)}
 
-    def find_contexts(self, time_interval, satellite, hirs2nc_delivery_id, collo_version):
+    def find_contexts(self, time_interval, satellite, hirs2nc_delivery_id, hirs_avhrr_delivery_id):
 
         global delta_catalog
 
@@ -198,6 +179,6 @@ class HIRS_AVHRR(Computation):
         return [{'granule': file.data_interval.left,
                  'satellite': satellite,
                  'hirs2nc_delivery_id': hirs2nc_delivery_id,
-                 'collo_version': collo_version}
+                 'hirs_avhrr_delivery_id': hirs_avhrr_delivery_id}
                 for file in files
                 if file.data_interval.left >= time_interval.left]

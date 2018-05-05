@@ -27,7 +27,7 @@ LOG = logging.getLogger(__name__)
 #
 
 # General information
-#collo_version = '0.1.65'
+#hirs_avhrr_delivery_id = '20180505-1'
 wedge = timedelta(seconds=1.)
 
 # Satellite specific information
@@ -62,7 +62,7 @@ def setup_computation(satellite):
 # Local execution
 #
 
-def local_execute_example(interval, satellite, hirs2nc_delivery_id, collo_version,
+def local_execute_example(interval, satellite, hirs2nc_delivery_id, hirs_avhrr_delivery_id,
                           skip_prepare=False, skip_execute=False, verbosity=2):
 
     setup_logging(verbosity)
@@ -71,7 +71,7 @@ def local_execute_example(interval, satellite, hirs2nc_delivery_id, collo_versio
     hirs2nc_comp = hirs2nc.HIRS2NC()
 
     # Get the required context...
-    contexts =  comp.find_contexts(interval, satellite, hirs2nc_delivery_id, collo_version)
+    contexts =  comp.find_contexts(interval, satellite, hirs2nc_delivery_id, hirs_avhrr_delivery_id)
 
     if len(contexts) != 0:
         LOG.info("Candidate contexts in interval...")
@@ -93,13 +93,13 @@ def local_execute_example(interval, satellite, hirs2nc_delivery_id, collo_versio
     else:
         LOG.error("There are no valid {} contexts for the interval {}.".format(satellite, interval))
 
-def print_contexts(interval, satellite, hirs2nc_delivery_id, collo_version, verbosity=2):
+def print_contexts(interval, satellite, hirs2nc_delivery_id, hirs_avhrr_delivery_id, verbosity=2):
 
     setup_logging(verbosity)
 
     comp = setup_computation(satellite)
 
-    contexts = comp.find_contexts(interval, satellite, hirs2nc_delivery_id, collo_version)
+    contexts = comp.find_contexts(interval, satellite, hirs2nc_delivery_id, hirs_avhrr_delivery_id)
     for context in contexts:
         LOG.info(context)
 
