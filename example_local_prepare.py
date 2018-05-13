@@ -23,10 +23,10 @@ from flo.sw.hirs2nc.utils import setup_logging
 LOG = logging.getLogger(__name__)
 
 #
-# Local execution
+# General information
 #
 
-# General information
+#hirs2nc_delivery_id = '20180410-1'
 #hirs_avhrr_delivery_id = '20180505-1'
 wedge = timedelta(seconds=1.)
 

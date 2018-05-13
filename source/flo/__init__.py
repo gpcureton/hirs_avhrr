@@ -25,7 +25,7 @@ from flo.product import StoredProductCatalog
 
 import sipsprod
 from glutil import (
-    check_call,
+    #check_call,
     #dawg_catalog,
     delivered_software,
     support_software,
@@ -33,6 +33,7 @@ from glutil import (
     prepare_env,
     #nc_gen,
     nc_compress,
+    hdf_compress,
     reraise_as,
     #set_official_product_metadata,
     FileNotFound
@@ -53,6 +54,39 @@ class HIRS_AVHRR(Computation):
 
     parameters = ['granule', 'satellite', 'hirs2nc_delivery_id', 'hirs_avhrr_delivery_id']
     outputs = ['out']
+
+    def find_contexts(self, time_interval, satellite, hirs2nc_delivery_id, hirs_avhrr_delivery_id):
+
+        global delta_catalog
+
+        LOG.debug('delta_catalog.collection = {}'.format(delta_catalog.collection))
+        LOG.debug('delta_catalog.input_data = {}'.format(delta_catalog.input_data))
+
+        # Using HIR1B file info as the baseline for the required contexts
+        files = delta_catalog.files('hirs', satellite, 'HIR1B', time_interval)
+        #files = delta_catalog.files('avhrr', satellite, 'PTMSX', time_interval)
+
+        return [{'granule': file.data_interval.left,
+                 'satellite': satellite,
+                 'hirs2nc_delivery_id': hirs2nc_delivery_id,
+                 'hirs_avhrr_delivery_id': hirs_avhrr_delivery_id}
+                for file in files
+                if file.data_interval.left >= time_interval.left]
+
+    def hirs_to_time_interval(self, filename):
+        '''
+        Takes the HIRS filename as input and returns the 1-day time interval
+        covering that file.
+        '''
+
+        file_chunks = filename.split('.')
+        begin_time = datetime.strptime('.'.join(file_chunks[3:5]), 'D%y%j.S%H%M')
+        end_time = datetime.strptime('.'.join([file_chunks[3], file_chunks[5]]), 'D%y%j.E%H%M')
+
+        if end_time < begin_time:
+            end_time += timedelta(days=1)
+
+        return TimeInterval(begin_time, end_time)
 
     @reraise_as(WorkflowNotReady, FileNotFound, prefix='NSS.GHRR')
     def build_task(self, context, task):
@@ -77,10 +111,14 @@ class HIRS_AVHRR(Computation):
 
         LOG.debug("hirs input: {}".format(SPC.exists(hirs2nc_comp.dataset('out').product(hirs_context))))
 
-        LOG.debug('Getting HIR1B input...')
-        task.input('HIR1B', hirs2nc_comp.dataset('out').product(hirs_context))
-        LOG.debug('Getting PTMSX input...')
-        task.input('PTMSX', delta_catalog.file(sensor, satellite, file_type, granule))
+        hirs_file = hirs2nc_comp.dataset('out').product(hirs_context)
+        ptmsx_file = delta_catalog.file(sensor, satellite, file_type, granule)
+
+        LOG.debug('data_interval = {}'.format(ptmsx_file.data_interval))
+
+        task.input('HIR1B', hirs_file)
+        task.input('PTMSX', ptmsx_file)
+        task.option('data_interval', ptmsx_file.data_interval)
 
     def hirs_avhrr_collocation(self, inputs, context):
         '''
@@ -88,7 +126,7 @@ class HIRS_AVHRR(Computation):
         '''
 
         rc = 0
-        
+
         LOG.info('inputs = {}'.format(inputs))
 
         satellite = context['satellite']
@@ -163,22 +201,9 @@ class HIRS_AVHRR(Computation):
         # "tmp******", and that the output path is to be prepended, so return the basename.
         output = basename(colloc_file)
 
-        return {'out': nc_compress(output)}
+        data_interval = context['data_interval']
+        extra_attrs = {'begin_time': data_interval.left,
+                       'end_time': data_interval.right}
 
-    def find_contexts(self, time_interval, satellite, hirs2nc_delivery_id, hirs_avhrr_delivery_id):
-
-        global delta_catalog
-
-        LOG.debug('delta_catalog.collection = {}'.format(delta_catalog.collection))
-        LOG.debug('delta_catalog.input_data = {}'.format(delta_catalog.input_data))
-
-        # Using HIR1B file info as the baseline for the required contexts
-        files = delta_catalog.files('hirs', satellite, 'HIR1B', time_interval)
-        #files = delta_catalog.files('avhrr', satellite, 'PTMSX', time_interval)
-
-        return [{'granule': file.data_interval.left,
-                 'satellite': satellite,
-                 'hirs2nc_delivery_id': hirs2nc_delivery_id,
-                 'hirs_avhrr_delivery_id': hirs_avhrr_delivery_id}
-                for file in files
-                if file.data_interval.left >= time_interval.left]
+        #return {'out': hdf_compress(output)}
+        return {'out': {'file': hdf_compress(output), 'extra_attrs': extra_attrs}}
