@@ -1,0 +1,1 @@
+This project contains the python code required to run the HIRS/AVHRR collocation package in the Atmosphere-SIPS.
