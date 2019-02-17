@@ -23,11 +23,11 @@ from flo.sw.hirs2nc.utils import setup_logging
 LOG = logging.getLogger(__name__)
 
 #
-# Local execution
+# General information
 #
 
-# General information
-#collo_version = '0.1.65'
+#hirs2nc_delivery_id = '20180410-1'
+#hirs_avhrr_delivery_id = '20180505-1'
 wedge = timedelta(seconds=1.)
 
 # Satellite specific information
@@ -43,9 +43,9 @@ def setup_computation(satellite):
                   'PTMSX': '/mnt/software/flo/hirs_l1b_datalists/{0:}/PTMSX_{0:}_latest'.format(satellite)}
 
     # Data locations
-    collection = {'HIR1B': 'ILIAD',
+    collection = {'HIR1B': 'ARCDATA',
                   'CFSR': 'DELTA',
-                  'PTMSX': 'FJORD'}
+                  'PTMSX': 'APOLLO'}
 
     input_sources = {'collection':collection, 'input_data':input_data}
 
@@ -62,7 +62,7 @@ def setup_computation(satellite):
 # Local execution
 #
 
-def local_execute_example(interval, satellite, hirs2nc_delivery_id, collo_version,
+def local_execute_example(interval, satellite, hirs2nc_delivery_id, hirs_avhrr_delivery_id,
                           skip_prepare=False, skip_execute=False, verbosity=2):
 
     setup_logging(verbosity)
@@ -71,7 +71,7 @@ def local_execute_example(interval, satellite, hirs2nc_delivery_id, collo_versio
     hirs2nc_comp = hirs2nc.HIRS2NC()
 
     # Get the required context...
-    contexts =  comp.find_contexts(interval, satellite, hirs2nc_delivery_id, collo_version)
+    contexts =  comp.find_contexts(interval, satellite, hirs2nc_delivery_id, hirs_avhrr_delivery_id)
 
     if len(contexts) != 0:
         LOG.info("Candidate contexts in interval...")
@@ -82,24 +82,24 @@ def local_execute_example(interval, satellite, hirs2nc_delivery_id, collo_versio
             if not skip_prepare:
                 LOG.info("Running hirs_avhrr local_prepare()...")
                 LOG.info("Preparing context... {}".format(contexts[0]))
-                local_prepare(comp, contexts[0], download_only=[hirs2nc_comp])
+                local_prepare(comp, contexts[0], download_onlies=[hirs2nc_comp])
             if not skip_execute:
                 LOG.info("Running hirs_avhrr local_execute()...")
                 LOG.info("Running context... {}".format(contexts[0]))
-                local_execute(comp, contexts[0])
+                local_execute(comp, contexts[0], download_onlies=[hirs2nc_comp])
         except Exception, err:
             LOG.error("{}".format(err))
             LOG.debug(traceback.format_exc())
     else:
         LOG.error("There are no valid {} contexts for the interval {}.".format(satellite, interval))
 
-def print_contexts(interval, satellite, hirs2nc_delivery_id, collo_version, verbosity=2):
+def print_contexts(interval, satellite, hirs2nc_delivery_id, hirs_avhrr_delivery_id, verbosity=2):
 
     setup_logging(verbosity)
 
     comp = setup_computation(satellite)
 
-    contexts = comp.find_contexts(interval, satellite, hirs2nc_delivery_id, collo_version)
+    contexts = comp.find_contexts(interval, satellite, hirs2nc_delivery_id, hirs_avhrr_delivery_id)
     for context in contexts:
         LOG.info(context)
 

@@ -25,14 +25,15 @@ from flo.product import StoredProductCatalog
 
 import sipsprod
 from glutil import (
-    check_call,
+    #check_call,
     #dawg_catalog,
-    #delivered_software,
+    delivered_software,
     support_software,
     runscript,
     prepare_env,
     #nc_gen,
     nc_compress,
+    hdf_compress,
     reraise_as,
     #set_official_product_metadata,
     FileNotFound
@@ -45,32 +46,47 @@ LOG = logging.getLogger(__name__)
 
 SPC = StoredProductCatalog()
 
-sat_code_to_satellite = {
-    'NA' : 'noaa-06',
-    'NC' : 'noaa-07',
-    'NE' : 'noaa-08',
-    'NF' : 'noaa-09',
-    'NG' : 'noaa-10',
-    'NH' : 'noaa-11',
-    'ND' : 'noaa-12',
-    'NJ' : 'noaa-14',
-    'NK' : 'noaa-15',
-    'NL' : 'noaa-16',
-    'NM' : 'noaa-17',
-    'NN' : 'noaa-18',
-    'NP' : 'noaa-19',
-    'M2' : 'metop-a',
-    'M1' : 'metop-b' 
-    }
-
 def set_input_sources(input_locations):
     global delta_catalog
     delta_catalog = DeltaCatalog(**input_locations)
 
 class HIRS_AVHRR(Computation):
 
-    parameters = ['granule', 'satellite', 'hirs2nc_delivery_id', 'collo_version']
+    parameters = ['granule', 'satellite', 'hirs2nc_delivery_id', 'hirs_avhrr_delivery_id']
     outputs = ['out']
+
+    def find_contexts(self, time_interval, satellite, hirs2nc_delivery_id, hirs_avhrr_delivery_id):
+
+        global delta_catalog
+
+        LOG.debug('delta_catalog.collection = {}'.format(delta_catalog.collection))
+        LOG.debug('delta_catalog.input_data = {}'.format(delta_catalog.input_data))
+
+        # Using HIR1B file info as the baseline for the required contexts
+        #files = delta_catalog.files('hirs', satellite, 'HIR1B', time_interval)
+        files = delta_catalog.files('avhrr', satellite, 'PTMSX', time_interval)
+
+        return [{'granule': file.data_interval.left,
+                 'satellite': satellite,
+                 'hirs2nc_delivery_id': hirs2nc_delivery_id,
+                 'hirs_avhrr_delivery_id': hirs_avhrr_delivery_id}
+                for file in files
+                if file.data_interval.left >= time_interval.left]
+
+    def hirs_to_time_interval(self, filename):
+        '''
+        Takes the HIRS filename as input and returns the 1-day time interval
+        covering that file.
+        '''
+
+        file_chunks = filename.split('.')
+        begin_time = datetime.strptime('.'.join(file_chunks[3:5]), 'D%y%j.S%H%M')
+        end_time = datetime.strptime('.'.join([file_chunks[3], file_chunks[5]]), 'D%y%j.E%H%M')
+
+        if end_time < begin_time:
+            end_time += timedelta(days=1)
+
+        return TimeInterval(begin_time, end_time)
 
     @reraise_as(WorkflowNotReady, FileNotFound, prefix='NSS.GHRR')
     def build_task(self, context, task):
@@ -85,7 +101,7 @@ class HIRS_AVHRR(Computation):
         granule = context['granule']
 
         hirs_context = context.copy()
-        hirs_context.pop('collo_version')
+        hirs_context.pop('hirs_avhrr_delivery_id')
         LOG.debug("hirs_context: {}".format(hirs_context))
 
         # Initialize the hirs2nc module with the data locations
@@ -95,10 +111,14 @@ class HIRS_AVHRR(Computation):
 
         LOG.debug("hirs input: {}".format(SPC.exists(hirs2nc_comp.dataset('out').product(hirs_context))))
 
-        LOG.debug('Getting HIR1B input...')
-        task.input('HIR1B', hirs2nc_comp.dataset('out').product(hirs_context))
-        LOG.debug('Getting PTMSX input...')
-        task.input('PTMSX', delta_catalog.file(sensor, satellite, file_type, granule))
+        hirs_file = hirs2nc_comp.dataset('out').product(hirs_context)
+        ptmsx_file = delta_catalog.file(sensor, satellite, file_type, granule)
+
+        LOG.debug('data_interval = {}'.format(ptmsx_file.data_interval))
+
+        task.input('HIR1B', hirs_file)
+        task.input('PTMSX', ptmsx_file)
+        task.option('data_interval', ptmsx_file.data_interval)
 
     def hirs_avhrr_collocation(self, inputs, context):
         '''
@@ -106,11 +126,11 @@ class HIRS_AVHRR(Computation):
         '''
 
         rc = 0
-        
+
         LOG.info('inputs = {}'.format(inputs))
 
         satellite = context['satellite']
-        collo_version = context['collo_version']
+        hirs_avhrr_delivery_id = context['hirs_avhrr_delivery_id']
 
         hirs_file = inputs['HIR1B']
         patmosx_file = inputs['PTMSX']
@@ -119,23 +139,25 @@ class HIRS_AVHRR(Computation):
         work_dir = abspath(curdir)
         LOG.debug("working dir = {}".format(work_dir))
 
+        # Get the required collocation exe
+        delivery = delivered_software.lookup('hirs_avhrr', delivery_id=hirs_avhrr_delivery_id)
+        dist_root = pjoin(delivery.path, 'dist')
+        hirs_avhrr_bin = pjoin(dist_root, 'bin/hirs_avhrr_v4.exe')
+        version = delivery.version
+
+        # Get the required  environment variables
+        env = prepare_env([delivery])
+        LOG.debug(env)
+
         # Removing the output file if it exists
         granule_datestamp = '.'.join(basename(hirs_file).split('.')[3:8])
-        output_file = 'colloc.hirs.avhrr.{}.{}.v{}.hdf'.format(satellite, granule_datestamp, collo_version)
+        output_file = 'colloc.hirs.avhrr.{}.{}.v{}.hdf'.format(satellite, granule_datestamp, version)
         if os.path.exists(output_file):
             LOG.info('{} exists, removing...'.format(output_file))
             os.remove(output_file)
 
-        # Get the required collocation exe
-        hirs_avhrr = support_software.lookup('collopak', version=collo_version)
-        hirs_avhrr_bin = pjoin(hirs_avhrr.path,'bin/hirs_avhrr')
-
-        # Get the required  environment variables
-        env = prepare_env([hirs_avhrr])
-        LOG.debug(env)
-
-        cmd = '{} {} {}'.format(hirs_avhrr_bin, hirs_file, patmosx_file)
-        #cmd = 'sleep 1; touch colloc.avhrr_metopb.avhrr_metopb.20140101T000900_000900.nc'
+        cmd = '{} {} {} {}'.format(hirs_avhrr_bin, hirs_file, patmosx_file, output_file)
+        #cmd = 'sleep 1; touch {}'.format(output_file)
 
         try:
             LOG.debug("cmd = \\\n\t{}".format(cmd.replace(' ',' \\\n\t')))
@@ -146,14 +168,11 @@ class HIRS_AVHRR(Computation):
             LOG.error("hirs_avhrr binary {} returned a value of {}".format(hirs_avhrr_bin, rc_hirs_avhrr))
             return rc_hirs_avhrr, []
 
-        # Move vnpaerdt file to the output directory
-        temp_output_file = pjoin(work_dir, 'colloc.*.nc')
-        temp_output_file = glob(temp_output_file)
-        if len(temp_output_file) != 0:
-            temp_output_file = temp_output_file[0]
-            LOG.info('Found collocation file "{}", moving to {}...'.format(temp_output_file, output_file))
-            shutil.move(temp_output_file, output_file)
-            output_file = glob(output_file)[0]
+        # Verify output file
+        output_file = glob(output_file)
+        if len(output_file) != 0:
+            output_file = output_file[0]
+            LOG.info('Found collocation file "{}"'.format(output_file))
         else:
             LOG.error('There are no output collocation file "{}", aborting'.format(output_file))
             rc = 1
@@ -182,22 +201,9 @@ class HIRS_AVHRR(Computation):
         # "tmp******", and that the output path is to be prepended, so return the basename.
         output = basename(colloc_file)
 
-        return {'out': nc_compress(output)}
+        data_interval = context['data_interval']
+        extra_attrs = {'begin_time': data_interval.left,
+                       'end_time': data_interval.right}
 
-    def find_contexts(self, time_interval, satellite, hirs2nc_delivery_id, collo_version):
-
-        global delta_catalog
-
-        LOG.debug('delta_catalog.collection = {}'.format(delta_catalog.collection))
-        LOG.debug('delta_catalog.input_data = {}'.format(delta_catalog.input_data))
-
-        # Using HIR1B file info as the baseline for the required contexts
-        files = delta_catalog.files('hirs', satellite, 'HIR1B', time_interval)
-        #files = delta_catalog.files('avhrr', satellite, 'PTMSX', time_interval)
-
-        return [{'granule': file.data_interval.left,
-                 'satellite': satellite,
-                 'hirs2nc_delivery_id': hirs2nc_delivery_id,
-                 'collo_version': collo_version}
-                for file in files
-                if file.data_interval.left >= time_interval.left]
+        #return {'out': hdf_compress(output)}
+        return {'out': {'file': hdf_compress(output), 'extra_attrs': extra_attrs}}
