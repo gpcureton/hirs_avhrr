@@ -43,9 +43,9 @@ def setup_computation(satellite):
                   'PTMSX': '/mnt/software/flo/hirs_l1b_datalists/{0:}/PTMSX_{0:}_latest'.format(satellite)}
 
     # Data locations
-    collection = {'HIR1B': 'ILIAD',
+    collection = {'HIR1B': 'ARCDATA',
                   'CFSR': 'DELTA',
-                  'PTMSX': 'FJORD'}
+                  'PTMSX': 'APOLLO'}
 
     input_sources = {'collection':collection, 'input_data':input_data}
 
@@ -82,11 +82,11 @@ def local_execute_example(interval, satellite, hirs2nc_delivery_id, hirs_avhrr_d
             if not skip_prepare:
                 LOG.info("Running hirs_avhrr local_prepare()...")
                 LOG.info("Preparing context... {}".format(contexts[0]))
-                local_prepare(comp, contexts[0], download_only=[hirs2nc_comp])
+                local_prepare(comp, contexts[0], download_onlies=[hirs2nc_comp])
             if not skip_execute:
                 LOG.info("Running hirs_avhrr local_execute()...")
                 LOG.info("Running context... {}".format(contexts[0]))
-                local_execute(comp, contexts[0])
+                local_execute(comp, contexts[0], download_onlies=[hirs2nc_comp])
         except Exception, err:
             LOG.error("{}".format(err))
             LOG.debug(traceback.format_exc())

@@ -63,8 +63,8 @@ class HIRS_AVHRR(Computation):
         LOG.debug('delta_catalog.input_data = {}'.format(delta_catalog.input_data))
 
         # Using HIR1B file info as the baseline for the required contexts
-        files = delta_catalog.files('hirs', satellite, 'HIR1B', time_interval)
-        #files = delta_catalog.files('avhrr', satellite, 'PTMSX', time_interval)
+        #files = delta_catalog.files('hirs', satellite, 'HIR1B', time_interval)
+        files = delta_catalog.files('avhrr', satellite, 'PTMSX', time_interval)
 
         return [{'granule': file.data_interval.left,
                  'satellite': satellite,
